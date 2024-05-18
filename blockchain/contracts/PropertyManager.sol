@@ -16,8 +16,9 @@ contract PropertyManager {
         _;
     }
 
-    event PropertyListed(uint256 indexed id, address indexed owner, uint256 pricePerDay);
     event Debug(string message);
+    event PropertyAvailabilityUpdated(uint256 indexed id, bool isAvailable);
+    event PropertyListed(uint256 indexed id, address indexed owner, uint256 pricePerDay);
 
     function listProperty(uint256 _pricePerDay) external {
         require(_pricePerDay > 0, "Price per day must be greater than zero");
@@ -41,9 +42,8 @@ contract PropertyManager {
         return (property.owner, property.pricePerDay, property.isAvailable);
     }
 
-    function updatePropertyAvailability(uint256 _propertyId, bool _availability) external onlyPropertyOwner(_propertyId) {
-        Property storage property = properties[_propertyId];
-        require(property.owner == msg.sender, "Only property owner can update availability");
-        property.isAvailable = _availability;
+    function updatePropertyAvailability(uint256 _propertyId, bool _availability) external payable onlyPropertyOwner(_propertyId) {
+        properties[_propertyId].isAvailable = _availability;
+        emit PropertyAvailabilityUpdated(_propertyId, _availability);
     }
 }

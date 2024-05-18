@@ -1,0 +1,45 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ninterface AggregatorV3Interface {\n  function decimals() external view returns (uint8);\n\n  function description() external view returns (string memory);\n\n  function version() external view returns (uint256);\n\n  function getRoundData(\n    uint80 _roundId\n  ) external view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound);\n\n  function latestRoundData()\n    external\n    view\n    returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound);\n}\n"
+    },
+    "contracts/PriceConverter.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol\";\n\nlibrary PriceConverter {\n    function getPrice(AggregatorV3Interface priceFeed) internal view returns (uint256) {\n        (, int256 answer, , , ) = priceFeed.latestRoundData();\n        return uint256(answer * 10000000000);\n    }\n\n    function getUsdAmount(uint256 ethAmount, AggregatorV3Interface priceFeed)\n        internal\n        view\n        returns (uint256)\n    {\n        uint256 ethPrice = getPrice(priceFeed);\n        uint256 ethAmountInUsd = weiToEth(ethPrice * ethAmount);\n        return ethAmountInUsd;\n    }\n\n    function weiToEth(uint256 _wei) internal pure returns (uint256) {\n        return _wei / 1000000000000000000;\n    }\n}\n"
+    },
+    "contracts/PropertyManager.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract PropertyManager {\n    struct Property {\n        address owner;\n        uint256 pricePerDay;\n        bool isAvailable;\n    }\n\n    mapping(uint256 => Property) public properties;\n    uint256 public propertyCount;\n\n    modifier onlyPropertyOwner(uint256 _propertyId) {\n        require(properties[_propertyId].owner == msg.sender, \"Only property owner can perform this action\");\n        _;\n    }\n\n    event Debug(string message);\n    event PropertyAvailabilityUpdated(uint256 indexed id, bool isAvailable);\n    event PropertyListed(uint256 indexed id, address indexed owner, uint256 pricePerDay);\n\n    function listProperty(uint256 _pricePerDay) external {\n        require(_pricePerDay > 0, \"Price per day must be greater than zero\");\n\n        properties[propertyCount] = Property({\n            owner: msg.sender,\n            pricePerDay: _pricePerDay,\n            isAvailable: true\n        });\n        propertyCount++;\n\n        emit PropertyListed(propertyCount, msg.sender, _pricePerDay);\n    }\n\n    function getProperty(uint256 _propertyId) external view returns (\n        address owner,\n        uint256 pricePerDay,\n        bool isAvailable\n    ) {\n        Property storage property = properties[_propertyId];\n        return (property.owner, property.pricePerDay, property.isAvailable);\n    }\n\n    function updatePropertyAvailability(uint256 _propertyId, bool _availability) external payable onlyPropertyOwner(_propertyId) {\n        properties[_propertyId].isAvailable = _availability;\n        emit PropertyAvailabilityUpdated(_propertyId, _availability);\n    }\n}"
+    },
+    "contracts/RentalManager.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol\";\n\nimport \"./PropertyManager.sol\";\nimport \"./PriceConverter.sol\";\n\ncontract RentalManager {\n    using PriceConverter for uint256;\n    AggregatorV3Interface private s_priceFeed;\n\n    struct Rental {\n        address owner;\n        address tenant;\n        uint256 propertyId;\n        uint256 startDate;\n        uint256 duration;\n        uint256 totalPrice;\n        bool isActive;\n        bool isWaitingConfirmation;\n    }\n\n    mapping(uint256 => Rental) public rentals;\n    uint256 public rentalCount;\n\n    modifier onlyPropertyOwner(uint256 _rentalId) {\n        require(rentals[_rentalId].owner == msg.sender, \"Only property owner can perform this action\");\n        _;\n    }\n\n    modifier waitingConfirmation(uint256 _rentalId) {\n        require(rentals[_rentalId].isWaitingConfirmation, \"Rental is not waiting for confirmation\");\n        _;\n    }\n\n    PropertyManager public propertyManager;\n\n    event Debug(string message);  \n    event RentalConfirmed(uint256 indexed id, address indexed owner, address indexed tenant, uint256 propertyId);\n    event RentalRejected(uint256 indexed id, address indexed owner, address indexed tenant, uint256 propertyId);\n    event RentalCreated(uint256 indexed id, address indexed owner, address indexed tenant, uint256 propertyId, uint256 startDate, uint256 duration, uint256 totalPrice);\n    event RentalCompleted(uint256 indexed id, address indexed owner, address indexed tenant, uint256 propertyId, uint256 endDate);\n\n    constructor(address _propertyManagerAddress, address priceFeed) {\n        propertyManager = PropertyManager(_propertyManagerAddress);\n        s_priceFeed = AggregatorV3Interface(priceFeed);\n    }\n\n    function rentProperty(uint256 _propertyId, uint256 _duration) external payable {\n        (address owner, uint256 pricePerDay, bool isAvailable) = propertyManager.getProperty(_propertyId);\n        require(isAvailable, \"Property not available for rent\");\n        require(msg.value >= pricePerDay * 10**18 * _duration, \"Insufficient funds sent\");\n        uint256 totalPrice = pricePerDay * _duration;\n\n        rentals[rentalCount] = Rental(owner, msg.sender, _propertyId, block.timestamp, _duration, totalPrice, false, true);\n        rentalCount++;\n\n        emit RentalCreated(rentalCount, owner, msg.sender, _propertyId, block.timestamp, _duration, totalPrice);\n    }\n\n    function confirmPropertyRent(uint256 _rentalId) external onlyPropertyOwner(_rentalId) waitingConfirmation(_rentalId) {\n        Rental storage rental = rentals[_rentalId];\n\n        rental.isWaitingConfirmation = false;\n        rental.isActive = true;\n\n        (bool success, ) = rental.owner.call{value: rental.totalPrice * 10**18}(\"\");\n        require(success, \"Transfer failed.\");\n\n        emit RentalConfirmed(_rentalId, rental.owner, rental.tenant, rental.propertyId);  \n    }\n\n\n    function rejectPropertyRent(uint256 _rentalId) external onlyPropertyOwner(_rentalId) waitingConfirmation(_rentalId) {\n        Rental storage rental = rentals[_rentalId];\n\n        rental.isWaitingConfirmation = false;\n\n        (bool success, ) = rental.tenant.call{value: rental.totalPrice * 10**18}(\"\");\n        require(success, \"Transfer failed.\");\n\n        emit RentalRejected(_rentalId, rental.owner, rental.tenant, rental.propertyId);\n    }\n\n    function completeRental(uint256 _rentalId) external onlyPropertyOwner(_rentalId) {\n        require(rentals[_rentalId].isActive, \"Rental already completed\");\n\n        uint256 endDate = rentals[_rentalId].startDate + rentals[_rentalId].duration * 1 days;\n        require(block.timestamp >= endDate, \"Rental duration not completed yet\");\n\n        rentals[_rentalId].isActive = false;\n\n        emit RentalCompleted(_rentalId, rentals[_rentalId].owner, rentals[_rentalId].tenant, rentals[_rentalId].propertyId, block.timestamp);\n    }\n\n    function getRental(uint256 _rentalId) external view returns (\n        Rental memory rental\n    ) {\n        return rentals[_rentalId];\n    }\n\n    function calculateTotalPrice(uint256 _pricePerDay, uint256 _duration) public view returns (uint256 _totalEth, uint256 _totalUsd) {\n        uint256 totalEth = _pricePerDay * _duration;\n        uint256 totalUsd = PriceConverter.getUsdAmount(totalEth, s_priceFeed);\n        return (totalEth, totalUsd);\n    }\n}\n\n\n"
+    }
+  },
+  "settings": {
+    "optimizer": {
+      "enabled": true,
+      "runs": 10000
+    },
+    "evmVersion": "paris",
+    "outputSelection": {
+      "*": {
+        "*": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "metadata",
+          "devdoc",
+          "userdoc",
+          "storageLayout",
+          "evm.gasEstimates"
+        ],
+        "": [
+          "ast"
+        ]
+      }
+    },
+    "metadata": {
+      "useLiteralContent": true
+    }
+  }
+}

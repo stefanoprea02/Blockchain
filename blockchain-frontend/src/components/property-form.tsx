@@ -4,19 +4,7 @@ import { useAppContext } from "../contexts/AppContext";
 const PropertyForm = () => {
   const [pricePerDay, setPricePerDay] = useState<string>("");
   const [success, setSuccess] = useState<boolean>(false);
-  const { propertyManagerContract } = useAppContext();
-
-  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    setSuccess(false);
-    event.preventDefault();
-    const pricePerDayNumber = Number(pricePerDay);
-    const res = await propertyManagerContract.methods
-      .listProperty(pricePerDayNumber)
-      .send({ from: `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266` });
-
-    console.log(res);
-    setPricePerDay("");
-  };
+  const { propertyManagerContract, account } = useAppContext();
 
   useEffect(() => {
     if (propertyManagerContract) {
@@ -27,6 +15,19 @@ const PropertyForm = () => {
       });
     }
   }, [propertyManagerContract]);
+
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    setSuccess(false);
+    event.preventDefault();
+
+    const pricePerDayNumber = Number(pricePerDay);
+    const res = await propertyManagerContract.methods
+      .listProperty(pricePerDayNumber)
+      .send({ from: account });
+
+    console.log(res);
+    setPricePerDay("");
+  };
 
   return (
     <form

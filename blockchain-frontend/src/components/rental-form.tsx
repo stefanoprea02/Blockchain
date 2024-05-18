@@ -8,22 +8,25 @@ type RentalFormProps = {
 
 const RentalForm = ({ id, pricePerDay }: RentalFormProps) => {
   const [days, setDays] = useState<string>("");
+  const [success, setSuccess] = useState<boolean>(false);
   const [totals, setTotals] = useState<{
     totalEth: bigint;
     totalUsd: bigint;
   }>({ totalEth: BigInt(0), totalUsd: BigInt(0) });
-  const { rentalManagerContract, web3 } = useAppContext();
+  const { rentalManagerContract, web3, account, isLocal } = useAppContext();
 
   useEffect(() => {
     if (rentalManagerContract) {
       rentalManagerContract.events.RentalCreated().on("data", (event) => {
         console.log("RentalCreated event:", event);
         console.log(event.returnValues);
+        setSuccess(true);
       });
     }
   }, [rentalManagerContract]);
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    setSuccess(false);
     const valueInWei = web3.utils.toWei(totals.totalEth.toString(), "ether");
     console.log(valueInWei);
 
@@ -31,7 +34,7 @@ const RentalForm = ({ id, pricePerDay }: RentalFormProps) => {
     const res = await rentalManagerContract.methods
       .rentProperty(id, Number(days))
       .send({
-        from: `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`,
+        from: isLocal ? `0x976EA74026E726554dB657fA54763abd0C3a0aa9` : account,
         value: valueInWei,
       });
 
@@ -71,6 +74,7 @@ const RentalForm = ({ id, pricePerDay }: RentalFormProps) => {
         <p style={{ margin: 0 }}>Total usd: {totals.totalUsd.toString()}</p>
       </div>
       <button type="submit">Create rental</button>
+      {success && <p>Rental added successfully!</p>}
     </form>
   );
 };

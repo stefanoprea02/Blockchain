@@ -26,6 +26,7 @@ interface ContextState {
   web3: Web3<RegisteredSubscription>;
   rentalManagerContract: Contract<ContractAbi>;
   propertyManagerContract: Contract<ContractAbi>;
+  isLocal: boolean;
 }
 
 const contextState: ContextState = {
@@ -38,6 +39,7 @@ const contextState: ContextState = {
   web3: {} as Web3<RegisteredSubscription>,
   rentalManagerContract: {} as Contract<ContractAbi>,
   propertyManagerContract: {} as Contract<ContractAbi>,
+  isLocal: true,
 };
 
 const AppContext = createContext<ContextState>(contextState);
@@ -88,9 +90,14 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
     rentalManagerAddress
   );
 
+  //0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0 rental manager
+  //0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+  //0x976EA74026E726554dB657fA54763abd0C3a0aa9
+
   useEffect(() => {
     if (!account) {
-      connectToMetaMask();
+      if (isLocal) setAccount(`0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`);
+      else connectToMetaMask();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connected]);
@@ -107,6 +114,7 @@ export const AppContextProvider: React.FC<AppContextProviderProps> = ({
         web3,
         propertyManagerContract,
         rentalManagerContract,
+        isLocal,
       }}
     >
       {children}

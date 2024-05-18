@@ -164,6 +164,25 @@ export const propertyManagerABI: ContractAbi = [
         type: "uint256",
       },
       {
+        indexed: false,
+        internalType: "bool",
+        name: "isAvailable",
+        type: "bool",
+      },
+    ],
+    name: "PropertyAvailabilityUpdated",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "uint256",
+        name: "id",
+        type: "uint256",
+      },
+      {
         indexed: true,
         internalType: "address",
         name: "owner",
@@ -278,10 +297,11 @@ export const propertyManagerABI: ContractAbi = [
     ],
     name: "updatePropertyAvailability",
     outputs: [],
-    stateMutability: "nonpayable",
+    stateMutability: "payable",
     type: "function",
   },
 ];
+
 export const rentalManagerABI: ContractAbi = [
   {
     inputs: [
@@ -303,10 +323,29 @@ export const rentalManagerABI: ContractAbi = [
     anonymous: false,
     inputs: [
       {
+        indexed: false,
+        internalType: "string",
+        name: "message",
+        type: "string",
+      },
+    ],
+    name: "Debug",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
         indexed: true,
         internalType: "uint256",
         name: "id",
         type: "uint256",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "owner",
+        type: "address",
       },
       {
         indexed: true,
@@ -342,6 +381,43 @@ export const rentalManagerABI: ContractAbi = [
       {
         indexed: true,
         internalType: "address",
+        name: "owner",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "tenant",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "propertyId",
+        type: "uint256",
+      },
+    ],
+    name: "RentalConfirmed",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "uint256",
+        name: "id",
+        type: "uint256",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "owner",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
         name: "tenant",
         type: "address",
       },
@@ -371,6 +447,37 @@ export const rentalManagerABI: ContractAbi = [
       },
     ],
     name: "RentalCreated",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "uint256",
+        name: "id",
+        type: "uint256",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "owner",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "tenant",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "propertyId",
+        type: "uint256",
+      },
+    ],
+    name: "RentalRejected",
     type: "event",
   },
   {
@@ -439,34 +546,51 @@ export const rentalManagerABI: ContractAbi = [
     name: "getRental",
     outputs: [
       {
-        internalType: "address",
-        name: "tenant",
-        type: "address",
-      },
-      {
-        internalType: "uint256",
-        name: "propertyId",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "startDate",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "duration",
-        type: "uint256",
-      },
-      {
-        internalType: "uint256",
-        name: "totalPrice",
-        type: "uint256",
-      },
-      {
-        internalType: "bool",
-        name: "isActive",
-        type: "bool",
+        components: [
+          {
+            internalType: "address",
+            name: "owner",
+            type: "address",
+          },
+          {
+            internalType: "address",
+            name: "tenant",
+            type: "address",
+          },
+          {
+            internalType: "uint256",
+            name: "propertyId",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "startDate",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "duration",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "totalPrice",
+            type: "uint256",
+          },
+          {
+            internalType: "bool",
+            name: "isActive",
+            type: "bool",
+          },
+          {
+            internalType: "bool",
+            name: "isWaitingConfirmation",
+            type: "bool",
+          },
+        ],
+        internalType: "struct RentalManager.Rental",
+        name: "rental",
+        type: "tuple",
       },
     ],
     stateMutability: "view",

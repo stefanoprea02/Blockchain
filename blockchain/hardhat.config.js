@@ -1,4 +1,5 @@
 require('@nomiclabs/hardhat-ethers');
+require("@nomicfoundation/hardhat-chai-matchers");
 require('hardhat-deploy');
 
 /** @type import('hardhat/config').HardhatUserConfig */
@@ -6,7 +7,8 @@ module.exports = {
   defaultNetwork: "hardhat",
   networks: {
     hardhat: {
-      gas: "auto",
+      gas: 2100000,
+      gasPrice: 8000000000,
       chainId: 31337
     },
     sepolia: {
@@ -33,6 +35,6 @@ module.exports = {
     deployer: {
         default: 0,
         1: 0,
-    },
+  },
 },
 };

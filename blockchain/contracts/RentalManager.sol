@@ -36,8 +36,11 @@ contract RentalManager {
 
     PropertyManager public propertyManager;
 
-    event RentalCreated(uint256 indexed id, address indexed tenant, uint256 propertyId, uint256 startDate, uint256 duration, uint256 totalPrice);
-    event RentalCompleted(uint256 indexed id, address indexed tenant, uint256 propertyId, uint256 endDate);
+    event Debug(string message);  
+    event RentalConfirmed(uint256 indexed id, address indexed owner, address indexed tenant, uint256 propertyId);
+    event RentalRejected(uint256 indexed id, address indexed owner, address indexed tenant, uint256 propertyId);
+    event RentalCreated(uint256 indexed id, address indexed owner, address indexed tenant, uint256 propertyId, uint256 startDate, uint256 duration, uint256 totalPrice);
+    event RentalCompleted(uint256 indexed id, address indexed owner, address indexed tenant, uint256 propertyId, uint256 endDate);
 
     constructor(address _propertyManagerAddress, address priceFeed) {
         propertyManager = PropertyManager(_propertyManagerAddress);
@@ -53,50 +56,48 @@ contract RentalManager {
         rentals[rentalCount] = Rental(owner, msg.sender, _propertyId, block.timestamp, _duration, totalPrice, false, true);
         rentalCount++;
 
-        payable(owner).transfer(totalPrice);
-
-        emit RentalCreated(rentalCount, msg.sender, _propertyId, block.timestamp, _duration, totalPrice);
+        emit RentalCreated(rentalCount, owner, msg.sender, _propertyId, block.timestamp, _duration, totalPrice);
     }
 
     function confirmPropertyRent(uint256 _rentalId) external onlyPropertyOwner(_rentalId) waitingConfirmation(_rentalId) {
-        propertyManager.updatePropertyAvailability(_rentalId, false);
-        rentals[_rentalId].isWaitingConfirmation = false;
+        Rental storage rental = rentals[_rentalId];
+
+        rental.isWaitingConfirmation = false;
+        rental.isActive = true;
+
+        (bool success, ) = rental.owner.call{value: rental.totalPrice * 10**18}("");
+        require(success, "Transfer failed.");
+
+        emit RentalConfirmed(_rentalId, rental.owner, rental.tenant, rental.propertyId);  
     }
 
+
     function rejectPropertyRent(uint256 _rentalId) external onlyPropertyOwner(_rentalId) waitingConfirmation(_rentalId) {
-        rentals[_rentalId].isWaitingConfirmation = false;
+        Rental storage rental = rentals[_rentalId];
+
+        rental.isWaitingConfirmation = false;
+
+        (bool success, ) = rental.tenant.call{value: rental.totalPrice * 10**18}("");
+        require(success, "Transfer failed.");
+
+        emit RentalRejected(_rentalId, rental.owner, rental.tenant, rental.propertyId);
     }
 
     function completeRental(uint256 _rentalId) external onlyPropertyOwner(_rentalId) {
-        Rental storage rental = rentals[_rentalId];
-        require(rental.isActive, "Rental already completed");
+        require(rentals[_rentalId].isActive, "Rental already completed");
 
-        uint256 endDate = rental.startDate + rental.duration * 1 days;
+        uint256 endDate = rentals[_rentalId].startDate + rentals[_rentalId].duration * 1 days;
         require(block.timestamp >= endDate, "Rental duration not completed yet");
 
-        rental.isActive = false;
-        propertyManager.updatePropertyAvailability(rental.propertyId, true);
+        rentals[_rentalId].isActive = false;
 
-        emit RentalCompleted(_rentalId, rental.tenant, rental.propertyId, block.timestamp);
+        emit RentalCompleted(_rentalId, rentals[_rentalId].owner, rentals[_rentalId].tenant, rentals[_rentalId].propertyId, block.timestamp);
     }
 
     function getRental(uint256 _rentalId) external view returns (
-        address tenant,
-        uint256 propertyId,
-        uint256 startDate,
-        uint256 duration,
-        uint256 totalPrice,
-        bool isActive
+        Rental memory rental
     ) {
-        Rental storage rental = rentals[_rentalId];
-        return (
-            rental.tenant,
-            rental.propertyId,
-            rental.startDate,
-            rental.duration,
-            rental.totalPrice,
-            rental.isActive
-        );
+        return rentals[_rentalId];
     }
 
     function calculateTotalPrice(uint256 _pricePerDay, uint256 _duration) public view returns (uint256 _totalEth, uint256 _totalUsd) {
